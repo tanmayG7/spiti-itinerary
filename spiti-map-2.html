@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spiti Circuit</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#1a73e8;--text:#202124;--sec:#5f6368;--line:#e8eaed;--surface:#fff;
+    --d1:#1a73e8;--d2:#188038;--d3:#e8710a;--d4:#9334e6;--d5:#d93025;
+    --paper:#faf6ee;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:'Roboto',Arial,sans-serif;color:var(--text);background:#fff;overflow:hidden;}
+
+  /* VIEW TOGGLE */
+  .viewtoggle{position:fixed;left:10px;top:50%;transform:translateY(-50%);z-index:1500;
+    background:#fff;border-radius:18px;box-shadow:0 2px 10px rgba(0,0,0,.22);padding:3px;
+    display:flex;flex-direction:column;gap:2px;}
+  .vt{border:none;background:none;font-family:'Roboto';font-size:11px;font-weight:700;letter-spacing:1px;
+    writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);padding:16px 6px;border-radius:15px;
+    cursor:pointer;color:var(--sec);transition:all .18s;}
+  .vt.active{background:var(--blue);color:#fff;}
+
+  .view{display:none;height:100vh;}
+  .view.active{display:block;}
+
+  /* ===== MAP VIEW ===== */
+  #view-map{display:none;}
+  #view-map.active{display:grid;grid-template-columns:380px 1fr;}
+  .panel{background:var(--surface);overflow-y:auto;box-shadow:0 0 12px rgba(0,0,0,.12);z-index:500;position:relative;}
+  .banner{padding:22px 20px 16px 50px;background:linear-gradient(135deg,#1a73e8,#9334e6);color:#fff;}
+  .banner h1{font-size:23px;font-weight:700;}
+  .banner p{font-size:13px;opacity:.92;margin-top:3px;}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px;}
+  .chips span{background:rgba(255,255,255,.22);font-size:11px;font-weight:500;padding:5px 10px;border-radius:14px;}
+  .daysec{border-bottom:1px solid var(--line);}
+  .daysec h2{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--sec);
+    padding:14px 20px 6px 50px;display:flex;align-items:center;gap:8px;}
+  .daysec h2::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c);}
+  .daysec h2 small{font-weight:400;letter-spacing:0;text-transform:none;color:#9aa0a6;margin-left:auto;font-size:11px;}
+  .stop{display:flex;gap:13px;padding:11px 20px 11px 50px;cursor:pointer;align-items:flex-start;transition:background .12s;}
+  .stop:hover{background:#f1f3f4;}
+  .stop .mk{width:26px;height:26px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-size:13px;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+  .stop .info .nm{font-size:14px;font-weight:500;line-height:1.3;}
+  .stop .info .tg{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;padding:1px 6px;
+    border-radius:4px;margin-top:4px;color:#fff;}
+  .stop .info .nt{font-size:12px;color:var(--sec);line-height:1.45;margin-top:4px;}
+  #map{height:100vh;width:100%;}
+  .leaflet-container{font-family:'Roboto',Arial,sans-serif;background:#e8eaed;}
+  .pin{filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));}
+  .leaflet-popup-content-wrapper{border-radius:10px;box-shadow:0 2px 7px 1px rgba(0,0,0,.3);padding:2px;}
+  .leaflet-popup-content{margin:14px 16px 13px;}
+  .gw .ttl{font-size:16px;font-weight:500;line-height:1.25;}
+  .gw .sub{font-size:12px;color:var(--sec);margin:5px 0 2px;display:flex;align-items:center;gap:7px;}
+  .gw .sub .b{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;color:#fff;}
+  .gw .nt{font-size:13px;color:#3c4043;line-height:1.5;margin-top:7px;}
+  .gw .dir{display:inline-flex;align-items:center;gap:6px;margin-top:11px;color:var(--blue);font-size:13px;font-weight:500;text-decoration:none;}
+  .leaflet-control-layers,.leaflet-bar{border:none!important;border-radius:8px!important;box-shadow:0 1px 4px rgba(0,0,0,.3)!important;}
+  .leaflet-bar a{width:36px!important;height:36px!important;line-height:36px!important;color:var(--sec)!important;font-size:18px!important;}
+
+  /* ===== ITINERARY VIEW ===== */
+  #view-itin{overflow-y:auto;background:var(--paper);padding-left:56px;}
+  .doc{max-width:760px;margin:0 auto;padding:0 26px 80px;}
+
+  .hero{position:relative;text-align:center;padding:96px 0 0;}
+  .hero .kicker{font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--d4);}
+  .hero h1{font-family:'Playfair Display',serif;font-size:58px;font-weight:800;line-height:1;margin:14px 0 10px;letter-spacing:-1px;}
+  .hero .lead{font-size:15px;color:var(--sec);max-width:480px;margin:0 auto;line-height:1.6;}
+  .hero .metarow{display:flex;justify-content:center;gap:26px;margin-top:22px;flex-wrap:wrap;}
+  .hero .metarow div{text-align:center;}
+  .hero .metarow b{display:block;font-family:'Playfair Display',serif;font-size:26px;font-weight:700;}
+  .hero .metarow span{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--sec);}
+  .ranges{width:100%;height:70px;margin-top:36px;display:block;}
+
+  /* route strip */
+  .routestrip{display:flex;align-items:center;justify-content:center;gap:0;margin:30px 0 50px;}
+  .routestrip .node{display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .routestrip .dot{width:34px;height:34px;border-radius:50%;color:#fff;font-weight:700;font-size:14px;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,.18);}
+  .routestrip .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--sec);font-weight:700;max-width:64px;text-align:center;line-height:1.2;}
+  .routestrip .seg{height:3px;width:34px;background:var(--line);margin-bottom:20px;border-radius:2px;}
+
+  .day{margin-bottom:46px;}
+  .day .dhead{display:flex;align-items:center;gap:14px;margin-bottom:6px;}
+  .day .dnum{width:46px;height:46px;border-radius:50%;color:#fff;font-family:'Playfair Display',serif;
+    font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;box-shadow:0 3px 8px rgba(0,0,0,.18);}
+  .day .dmeta .dl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--sec);}
+  .day .dmeta h2{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;line-height:1.1;}
+  .day .dsub{font-size:13px;font-style:italic;color:var(--dc);font-weight:500;margin:2px 0 16px 60px;}
+  .day .body{padding-left:60px;}
+  .day .body p{font-size:15px;line-height:1.78;color:#3c4043;margin-bottom:13px;}
+  .day .body strong{color:var(--text);font-weight:700;}
+
+  .callout{margin:18px 0 18px;padding:18px 20px;background:#fff;border-left:4px solid var(--dc);
+    border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+  .callout .q{font-family:'Playfair Display',serif;font-size:17px;font-weight:600;line-height:1.4;color:var(--text);}
+  .callout .who{font-size:12px;color:var(--sec);margin-top:6px;}
+
+  .divider{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 40px;color:#cdc6b8;}
+  .divider::before,.divider::after{content:"";height:1px;width:80px;background:#ddd5c6;}
+
+  .section-title{font-family:'Playfair Display',serif;font-size:30px;font-weight:700;text-align:center;margin:10px 0 26px;}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .card{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;gap:13px;align-items:flex-start;}
+  .card .ico{width:38px;height:38px;border-radius:10px;background:#eef3fe;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .card .ico svg{fill:var(--blue);}
+  .card .t{font-size:14px;font-weight:700;margin-bottom:3px;}
+  .card .d{font-size:12.5px;color:var(--sec);line-height:1.5;}
+
+  .fuel{margin-top:40px;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.06);text-align:center;}
+  .fuel h3{font-family:'Playfair Display',serif;font-size:22px;margin-bottom:18px;}
+  .fuelchain{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;}
+  .fuelchain .f{background:#eef3fe;color:var(--blue);font-weight:700;font-size:13px;padding:8px 14px;border-radius:20px;}
+  .fuelchain .arr{color:#bbb;font-size:18px;}
+  .fuel p{font-size:13px;color:var(--sec);margin-top:16px;line-height:1.6;}
+
+  .endnote{text-align:center;margin-top:54px;color:var(--sec);font-size:13px;}
+  .endnote .pf{font-family:'Playfair Display',serif;font-size:20px;color:var(--text);font-style:italic;margin-bottom:6px;}
+
+  @media(max-width:820px){
+    #view-map.active{grid-template-columns:1fr;grid-template-rows:46vh 54vh;}
+    #map{height:100%;}
+    .panel{order:2;}
+    .hero h1{font-size:40px;}
+    .hero{padding-top:84px;}
+    .day .dsub,.day .body{padding-left:0;margin-left:0;}
+    .cards{grid-template-columns:1fr;}
+    .routestrip{transform:scale(.85);transform-origin:center;}
+    #view-itin{padding-left:48px;}
+    .doc{padding:0 16px 80px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="viewtoggle">
+  <button class="vt active" data-view="map">Map</button>
+  <button class="vt" data-view="itin">Itinerary</button>
+</div>
+
+<!-- ===================== MAP VIEW ===================== -->
+<div id="view-map" class="view active">
+  <div class="panel">
+    <div class="banner">
+      <h1>Spiti Circuit</h1>
+      <p>Shimla in · Manali out · the smart acclimatization loop</p>
+      <div class="chips"><span>5 days</span><span>1,200+ km</span><span>26 stops</span></div>
+    </div>
+    <div id="list"></div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<!-- ===================== ITINERARY VIEW ===================== -->
+<div id="view-itin" class="view">
+  <div class="doc">
+    <div class="hero">
+      <div class="kicker">A Road Trip Guide</div>
+      <h1>Spiti Circuit</h1>
+      <p class="lead">Shimla side in, Manali side out. Do it in this direction, always. Gradual altitude gain going up is the smart play. One of the best things I have ever done.</p>
+      <div class="metarow">
+        <div><b>5</b><span>Days</span></div>
+        <div><b>1,200+</b><span>Kilometres</span></div>
+        <div><b>4,500m</b><span>Highest point</span></div>
+      </div>
+      <svg class="ranges" viewBox="0 0 760 70" preserveAspectRatio="none">
+        <polygon points="0,70 90,28 150,50 230,15 320,46 410,22 500,52 590,18 670,44 760,26 760,70" fill="#e7dfd0"/>
+        <polygon points="0,70 110,40 200,58 300,30 390,54 480,34 580,56 660,36 760,52 760,70" fill="#d8cdb8"/>
+      </svg>
+    </div>
+
+    <div class="routestrip" id="routestrip"></div>
+
+    <div id="days-itin"></div>
+
+    <div class="divider">✦</div>
+
+    <h2 class="section-title">What You Must Carry</h2>
+    <div class="cards" id="cards"></div>
+
+    <div class="fuel">
+      <h3>Fuel Strategy</h3>
+      <div class="fuelchain">
+        <span class="f">Ambala +10L can</span><span class="arr">→</span>
+        <span class="f">Rampur</span><span class="arr">→</span>
+        <span class="f">Kaza (world's highest pump)</span><span class="arr">→</span>
+        <span class="f">Mandi on return</span>
+      </div>
+      <p>The Kaza IndianOil pump is the only fuel for nearly 200 km in either direction, so top up there no matter what. Above Kaza, your reserve can is your lifeline.</p>
+    </div>
+
+    <div class="endnote">
+      <div class="pf">Drive slow. Look up at night. Trust the reserve can.</div>
+      Spiti Circuit · Personal Field Notes
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const COL={1:'#1a73e8',2:'#188038',3:'#e8710a',4:'#9334e6',5:'#d93025'};
+const DAYS=[
+ {n:1,t:"Delhi to Narkanda",s:"~12 hrs",short:"Narkanda"},
+ {n:2,t:"Narkanda to Tabo",s:"5:30 AM start",short:"Tabo"},
+ {n:3,t:"Tabo to Kaza",s:"relaxed",short:"Kaza"},
+ {n:4,t:"High villages + Key",s:"headline day",short:"High villages"},
+ {n:5,t:"Kaza to Delhi via Manali",s:"overnight",short:"Home"},
+];
+const STOPS=[
+ {d:1,name:"Delhi",ll:[28.6139,77.2090],tag:"START",note:"Rolled out 8:00 AM."},
+ {d:1,name:"Ambala",ll:[30.3782,76.7767],tag:"FUEL",note:"Full tank + 10L reserve jerry can."},
+ {d:1,name:"Narkanda",ll:[31.2641,77.4566],tag:"STAY",note:"Stay: Yarrows. Arrived ~8 PM."},
+ {d:2,name:"Rampur",ll:[31.4470,77.6320],tag:"FUEL",note:"Last big reliable pump before the gorge."},
+ {d:2,name:"Pooh",ll:[31.7575,78.5919],tag:"FOOD",note:"Cafe break."},
+ {d:2,name:"Nako",ll:[31.8786,78.6328],tag:"SIGHT",note:"Lake + village. Khab loops just before."},
+ {d:2,name:"Gue Monastery",ll:[32.1328313,78.5642436],tag:"SIGHT",note:"500+ year old mummy of Sangha Tenzin."},
+ {d:2,name:"Tabo",ll:[32.0926,78.3819],tag:"STAY",note:"Stay: Hotel Gakyi."},
+ {d:3,name:"Tabo Monastery",ll:[32.0926,78.3819],tag:"SIGHT",note:"Ajanta of the Himalayas. Morning visit."},
+ {d:3,name:"Kaza",ll:[32.2270,78.0720],tag:"STAY",note:"Stay: Spiti Heritage Hotel. Market wander."},
+ {d:3,name:"Kaza Petrol Pump",ll:[32.2276697,78.0698694],tag:"FUEL",note:"World's highest retail petrol pump (~12,270 ft). Only fuel for ~200 km either side. Top up no matter what."},
+ {d:3,name:"Hotel Deyzor",ll:[32.227285,78.068531],tag:"FOOD",note:"Dinner. Must visit. Behind BSNL office, Kaza."},
+ {d:4,name:"Langza",ll:[32.2700,78.0950],tag:"SIGHT",note:"Giant Buddha statue, fossils."},
+ {d:4,name:"Komic",ll:[32.2870,78.1230],tag:"SIGHT",note:"World's highest motorable village."},
+ {d:4,name:"Hikkim",ll:[32.2680,78.0980],tag:"SKIP",note:"World's highest post office. Skippable."},
+ {d:4,name:"Chicham Bridge",ll:[32.3560,78.0200],tag:"SIGHT",note:"Asia's highest suspension bridge."},
+ {d:4,name:"Key Monastery",ll:[32.2977,78.0120],tag:"SIGHT",note:"The iconic hilltop gompa."},
+ {d:4,name:"Spiti Village Resort",ll:[32.2875843,78.013048],tag:"STAY",note:"Check in + lunch. By Kee village. Early dinner, stargazing."},
+ {d:5,name:"Losar",ll:[32.4360,77.7830],tag:"FOOD",note:"Breakfast stop."},
+ {d:5,name:"Kunzum La",ll:[32.4040,77.6400],tag:"SIGHT",note:"High pass crossing."},
+ {d:5,name:"Batal",ll:[32.3450,77.5600],tag:"VIA",note:"Rough stretch. Drive slow."},
+ {d:5,name:"Khoksar",ll:[32.4080,77.2070],tag:"VIA",note:"Lahaul valley."},
+ {d:5,name:"Atal Tunnel",ll:[32.3700,77.1500],tag:"VIA",note:"Into the Manali side."},
+ {d:5,name:"Manali",ll:[32.2396,77.1887],tag:"SIGHT",note:"Shree Ram Sharnam visit."},
+ {d:5,name:"Mandi",ll:[31.7047246,76.9393473],tag:"FUEL",note:"Filled up again near Mandi on the way down."},
+ {d:5,name:"Delhi",ll:[28.6139,77.2090],tag:"END",note:"Overnight drive. Reached ~6 AM."},
+];
+
+// First-person itinerary content
+const ITIN=[
+ {d:1,sub:"Leave by 8 AM. No excuses.",html:`
+  <p>We left home at 8 and hit Narkanda by 8 PM with some night driving thrown in. The route is Delhi to Ambala to Shimla to Narkanda, straightforward on Google Maps.</p>
+  <p><strong>Fuel at Ambala. This is important.</strong> Fill a full tank AND carry a 10L jerry can as reserve. The valley ahead gets patchy. We grabbed Burger King and Starbucks along the way, so food is not a problem on this leg.</p>
+  <p>Stay at <strong>Yarrows, Narkanda.</strong> Good property, good night's sleep before the big push tomorrow.</p>`},
+ {d:2,sub:"Set your alarm for 5:30 AM. Long day, absolutely worth it.",html:`
+  <p>This is where the landscape shifts. You'll go from pine hills to high-altitude desert in one drive and it will blow your mind.</p>
+  <p><strong>Top up fuel at Rampur.</strong> This is your last reliable, large pump before the gorge road kicks in. Don't skip it.</p>
+  <p>There's a good cafe at <strong>Pooh</strong> for a chai and breakfast break. Before Pooh, the <strong>Khab confluence</strong> where Spiti meets Sutlej is wild, stop for two minutes.</p>
+  <p><strong>Nako</strong> is a beautiful lake village worth a short walk around. Then detour to <strong>Gue Monastery.</strong> The 500-year-old mummy of monk Sangha Tenzin sits there naturally preserved with skin and hair intact. Surreal and completely worth the detour.</p>
+  <p>End the day at <strong>Hotel Gakyi, Tabo.</strong> Good hosts, solid food.</p>`},
+ {d:3,sub:"Short drive. Use this day to acclimatize.",html:`
+  <p>Start with <strong>Tabo Monastery</strong> in the morning before you leave. They call it the Ajanta of the Himalayas and that's not an exaggeration. Ancient murals, quiet courtyards, no crowds early. Give it an hour.</p>
+  <p>Drive to Kaza and check in at <strong>Spiti Heritage Hotel.</strong> Walk around Kaza market in the evening, it's small but nice.</p>
+  <p><strong>Top up at the Kaza petrol pump while you're here.</strong> It's the world's highest retail petrol pump at around 12,270 ft, and the only fuel for nearly 200 km in either direction. Fill up whenever you can, the queue gets long.</p>
+  <div class="callout"><div class="q">"Dinner at Hotel Deyzor. I cannot recommend this place enough. Just go. No debate."</div><div class="who">The food is exceptional, the interiors gorgeous, host Karan is brilliant. Every traveller in Spiti mentions Deyzor.</div></div>
+  <p>Stargaze from wherever you're standing at night. Kaza at this altitude has zero light pollution. It's insane.</p>`},
+ {d:4,sub:"The headline day of the whole trip.",html:`
+  <p>Head up to <strong>Langza</strong> first. Giant Buddha statue against the Himalayan skyline, fossils literally on the ground. Then drive to <strong>Komic,</strong> the world's highest motorable village. The road, the views, the air, all of it hits different up here.</p>
+  <p><strong>Hikkim</strong> is the world's highest post office. Post a letter home if you want the experience. Honestly though, if you're tired or pressed for time, Hikkim is skippable.</p>
+  <p>Check in at <strong>Spiti Village Resort,</strong> right at the start of Kee village, close to Key Monastery. Have lunch there. Then drive to <strong>Chicham Bridge</strong> in the afternoon. Asia's highest suspension bridge over a dramatic gorge. Phenomenal.</p>
+  <p>Head to <strong>Key Monastery</strong> before sunset. The hilltop gompa with prayer flags and the whole valley below you is the image you carry home from Spiti. Have herbal tea there if the monks offer it.</p>
+  <p>Dinner at the resort by 6 PM. Stargazing from the property after. One of the best nights of the trip.</p>`},
+ {d:5,sub:"Leave by 5 AM. Overnight push. You got this.",html:`
+  <p>Breakfast at <strong>Losar,</strong> the last real village before the passes open up. Then it's Kunzum La, Batal, the rough Lahaul stretch through Khoksar, and finally the <strong>Atal Tunnel</strong> that drops you into the Manali side. Road quality jumps dramatically once you hit the tunnel.</p>
+  <p>Quick stop in <strong>Manali</strong> at Shree Ram Sharnam, then Manali to Delhi overnight. We topped up fuel again near <strong>Mandi</strong> on the way down. Reached home around 6 AM. Hard drive but the trip ends on a high.</p>`},
+];
+const CARDS=[
+ {t:"AMS medication",d:"Diamox, started before going high. Do not wing this."},
+ {t:"No infants",d:"The altitude is genuinely risky for young children."},
+ {t:"Perfect tyres",d:"Not good. Perfect. The roads demand it."},
+ {t:"One personal quilt",d:"Nights at altitude are brutal even in summer."},
+ {t:"Power banks",d:"Multiple. Charging is unreliable above Kaza."},
+ {t:"Jio SIM",d:"Other networks are mostly dead past Kinnaur. BSNL works too."},
+];
+
+/* ---- view toggle ---- */
+let mapReady=false;
+document.querySelectorAll('.vt').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.vt').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('view-'+b.dataset.view).classList.add('active');
+    if(b.dataset.view==='map'&&mapReady){setTimeout(()=>map.invalidateSize(),60);}
+  });
+});
+
+/* ---- MAP ---- */
+const voyager=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  {subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap &copy; CARTO'});
+const sat=L.layerGroup([
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}),
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19})
+]);
+const terrain=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{subdomains:'abc',maxZoom:17,attribution:'&copy; OpenTopoMap'});
+const map=L.map('map',{layers:[voyager],zoomControl:false}).setView([31.7,77.9],7);
+mapReady=true;
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.control.layers({"Map":voyager,"Satellite":sat,"Terrain":terrain},null,{position:'topright'}).addTo(map);
+for(let d=1;d<=5;d++){
+  const pts=STOPS.filter(s=>s.d===d).map(s=>s.ll);
+  if(d>1){const p=STOPS.filter(s=>s.d===d-1);pts.unshift(p[p.length-1].ll);}
+  L.polyline(pts,{color:'#fff',weight:8,opacity:.9,lineCap:'round',lineJoin:'round'}).addTo(map);
+  L.polyline(pts,{color:COL[d],weight:5,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(map);
+}
+function pin(num,color){
+  const svg=`<svg class="pin" width="30" height="42" viewBox="0 0 30 42"><path d="M15 0C7 0 .5 6.5.5 14.5.5 25.6 15 42 15 42s14.5-16.4 14.5-27.5C29.5 6.5 23 0 15 0z" fill="${color}"/><circle cx="15" cy="14.5" r="9.5" fill="#fff"/><text x="15" y="19" text-anchor="middle" font-size="13" font-weight="700" fill="${color}" font-family="Roboto">${num}</text></svg>`;
+  return L.divIcon({className:'',html:svg,iconSize:[30,42],iconAnchor:[15,42],popupAnchor:[0,-38]});
+}
+const markers={};
+STOPS.forEach(s=>{
+  const m=L.marker(s.ll,{icon:pin(s.d,COL[s.d])}).addTo(map);
+  const g=`https://www.google.com/maps/search/?api=1&query=${s.ll[0]},${s.ll[1]}`;
+  m.bindPopup(`<div class="gw"><div class="ttl">${s.name}</div><div class="sub">Day ${s.d}<span class="b" style="background:${COL[s.d]}">${s.tag}</span></div><div class="nt">${s.note}</div><a class="dir" href="${g}" target="_blank">Open in Google Maps</a></div>`);
+  markers[s.name]=m;
+});
+const list=document.getElementById('list');
+DAYS.forEach(day=>{
+  const sec=document.createElement('div');sec.className='daysec';sec.style.setProperty('--c',COL[day.n]);
+  const stops=STOPS.filter(s=>s.d===day.n);
+  sec.innerHTML=`<h2>Day ${day.n} · ${day.t}<small>${day.s}</small></h2>`+
+    stops.map(s=>`<div class="stop" data-n="${s.name}"><div class="mk" style="background:${COL[day.n]}">${day.n}</div><div class="info"><div class="nm">${s.name}</div><span class="tg" style="background:${COL[day.n]}">${s.tag}</span><div class="nt">${s.note}</div></div></div>`).join('');
+  sec.querySelectorAll('.stop').forEach(st=>st.addEventListener('click',()=>{
+    const m=markers[st.dataset.n];map.flyTo(m.getLatLng(),13,{duration:.8});m.openPopup();
+  }));
+  list.appendChild(sec);
+});
+map.fitBounds(STOPS.map(s=>s.ll),{padding:[50,50]});
+
+/* ---- ITINERARY VIEW build ---- */
+const rs=document.getElementById('routestrip');
+DAYS.forEach((day,i)=>{
+  if(i>0)rs.insertAdjacentHTML('beforeend',`<div class="seg"></div>`);
+  rs.insertAdjacentHTML('beforeend',`<div class="node"><div class="dot" style="background:${COL[day.n]}">${day.n}</div><div class="lbl">${day.short}</div></div>`);
+});
+const di=document.getElementById('days-itin');
+ITIN.forEach(it=>{
+  const day=DAYS.find(d=>d.n===it.d);
+  di.insertAdjacentHTML('beforeend',`<div class="day" style="--dc:${COL[it.d]}">
+    <div class="dhead"><div class="dnum" style="background:${COL[it.d]}">${it.d}</div>
+    <div class="dmeta"><div class="dl">Day ${it.d}</div><h2>${day.t}</h2></div></div>
+    <div class="dsub">${it.sub}</div>
+    <div class="body">${it.html}</div></div>`);
+});
+const cico=`<svg width="20" height="20" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+document.getElementById('cards').innerHTML=CARDS.map(c=>
+  `<div class="card"><div class="ico">${cico}</div><div><div class="t">${c.t}</div><div class="d">${c.d}</div></div></div>`).join('');
+</script>
+</body>
+</html>
